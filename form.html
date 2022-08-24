@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>form</title>
+	<style>
+		#header{
+			text-align: center;
+			background-color:blueviolet ;
+
+		}
+		body{
+			margin: 5vW;
+			padding: 0px;
+			/*text-align: center;*/
+			background-color: gold;
+			}
+		input{
+			font-family: comic sans ms;
+			text-align: center;
+		}
+		label{
+			font-family: comic sans ms;
+			text-align: center;
+		}
+		#botton{
+			background-color: chocolate;
+			color: black;
+			float: left;
+			font-size: 20px;
+			}
+	</style>
+</head>
+<body>
+	<form action="connect.php" method="post">
+			<h1 id="header">form for class 10 student</h1>
+				<br>
+				<br>
+			<label for="Roll_No">Roll No</label>
+		<input type="text" name="Roll_No" placeholder="Enter your Roll No">
+		<br>
+		<br>
+
+		<label id="name" for="name">Enter your name:</label>
+		<input type="text" placeholder="Enter your name" name="name"><br><br>
+
+		<label id="address" for="address">Enter Address:</label>
+		<input type="text" placeholder="Enter your Address" name="address"><br><br>
+
+		<label for="PhoneNumber">Phone Number</label>
+		<input type="text" name="PhoneNumber" placeholder="Enter your Phone Number">
+		<br><br>
+		<label>Gender:</label>
+		<input value="male" type="radio" name="Gender">
+		<label for="male">male</label>
+		<input value="femail" type="radio" name="Gender">
+		<label for="femail">female</label>
+		<input value="other" type="radio" name="Gender">
+		<label for="other">OTHER</label>
+		<br>
+		<br>
+		<label for="Email">Email</label>
+		<input type="Email" name="Email" placeholder="Enter your Email">
+		<br>
+		<br>
+		<label for="father_name">Father Name</label>
+		<input type="text" name="father_name" placeholder="Enter your Father Name">
+		<br><br>
+		<label for="Mother_name">Mother Name</label>
+		<input type="text" name="Mother_name" placeholder="Enter your Mother Name">
+		<br>
+		<br>
+		<label for="DOB">DOB</label>
+		<input type="date" name="DOB" placeholder="Enter your date of birth">
+		<br>
+		<br>
+
+		
+		<button id="botton" type="submit">submit</button>
+	</form>
+	<br>
+	<br>
+	<footer id="header"><h1>&copy;Class 10 DBMS Form</h1></footer>
+</body>
+</html>
