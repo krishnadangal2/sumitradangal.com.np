@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cutout – Batch Background Remover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f5;--surface:#fff;--ink:#1b2233;--muted:#5d6678;--line:#d5dbe5;--accent:#0e7c66;--accent-ink:#fff;--chk1:#fff;--chk2:#dfe4ec;--danger:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#12161f;--surface:#1b2130;--ink:#eef1f7;--muted:#9aa4b8;--line:#2c3447;--accent:#2fc4a0;--accent-ink:#06231c;--chk1:#2a3142;--chk2:#222838;--danger:#ff8a80}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.5;min-height:100vh}
+.wrap{max-width:1100px;margin:0 auto;padding:36px 20px 64px}
+h1{font-size:clamp(2rem,5vw,3rem);line-height:1.05;margin:0 0 8px;font-weight:800;letter-spacing:-.02em}
+.lead{margin:0 0 22px;color:var(--muted);max-width:64ch}
+.banner{display:none;margin-bottom:18px;padding:12px 16px;border:1px solid var(--danger);border-radius:12px;color:var(--danger);font-weight:600}
+#status{display:none;position:sticky;top:8px;z-index:5;margin-bottom:16px;padding:10px 16px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-weight:600}
+.group{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:20px}
+.ghead{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;margin-bottom:14px}
+.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted);font-weight:600}
+.f input[type=text],.f select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:150px}
+.f input[type=color]{width:100%;height:36px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer}
+.spacer{flex:1}
+.btn{font:inherit;font-weight:600;border-radius:10px;padding:9px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.sm{padding:5px 10px;font-size:.85rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.note{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:14px;padding:10px 14px;border-radius:12px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));font-weight:600}
+.note[hidden]{display:none}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;color:var(--muted)}
+.drop strong{color:var(--ink);display:block}
+.drop.over,.drop:hover{border-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:14px}
+.card{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.thumb{height:150px;display:flex;align-items:center;justify-content:center}
+.checker{background-color:var(--chk1);background-image:conic-gradient(var(--chk2) 25%,transparent 0 50%,var(--chk2) 0 75%,transparent 0);background-size:16px 16px}
+.thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.card:not([data-state=done]) .thumb img{opacity:.45}
+.nm{padding:8px 10px 0;font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st{padding:0 10px;font-size:.8rem;color:var(--muted);min-height:1.4em}
+.card[data-state=error] .st{color:var(--danger)}
+.row{display:flex;gap:6px;padding:8px 10px 10px}
+.row .dlb{flex:1}
+.foot{margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:.9rem}
+footer{color:var(--muted);font-size:.85rem;margin-top:28px;max-width:80ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Batch background remover</h1>
+  <p class="lead">Add one or more groups of photos. Each group has its own AI model, enhancement, output format and background. All groups are processed at the same time, right in your browser — nothing is uploaded. You can change any setting after a photo is done.</p>
+  <div class="banner" id="banner">This page was opened directly from your computer. The browser blocks the AI model that way — open it through a local server or a web host.</div>
+  <div id="status" role="status"></div>
+  <div id="groups"></div>
+  <button class="btn primary" id="addGroup">Add another group</button>
+  <footer>Cutouts keep your original pixel size. Changing the format, background or enhancement updates finished photos instantly. Changing the AI model offers to process the finished photos again with the new model. Enhancement is off by default so your pixels stay exact; when on, it gently sharpens, lifts contrast and colour, and cleans the cutout edges. JPG cannot be transparent, so it uses your background colour (white if transparent is selected).</footer>
+</div>
+
+<script type="module">
+import { removeBackground, preload } from "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm";
+
+if (location.protocol === "file:") document.getElementById("banner").style.display = "block";
+
+/* ---------- models & settings ---------- */
+const MODELS = [
+  ["isnet_fp16", "Balanced (recommended)"],
+  ["isnet", "Best quality (slowest)"],
+  ["isnet_quint8", "Fast (rougher edges)"]
+];
+const modelName = m => (MODELS.find(x => x[0] === m)?.[1] || m).split(" (")[0];
+let gpuOK = false;   // without a GPU the fp16 model is slow, so a small model is the default there
+try { gpuOK = !!(navigator.gpu && await navigator.gpu.requestAdapter()); } catch {}
+const DEFAULT_MODEL = gpuOK ? "isnet_fp16" : "isnet_quint8";
+
+// If a "bgdata" folder (the downloaded model package) sits next to this page, use it instead of the internet.
+let PUBLIC = "";
+try {
+  const u = new URL("bgdata/", location.href).href;
+  const r = await fetch(u + "resources.json", { cache: "no-store" });
+  if (r.ok) PUBLIC = u;
+} catch {}
+const cfg = (m, dev) => ({ model: m, device: dev, proxyToWorker: dev !== "cpu", output: { format: "image/png", quality: 1 }, ...(PUBLIC ? { publicPath: PUBLIC } : {}) });
+
+const setStatus = t => { const s = document.getElementById("status"); s.textContent = t; s.style.display = t ? "block" : "none"; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const isNet = e => /content-length|network|fetch|load failed|timeout|abort/i.test(e?.message || "");
+const savedKey = m => `bg-model-saved:${m}:${PUBLIC ? "local" : "cdn"}`;
+
+let lastProg = Date.now();
+// Restart the download if nothing has moved for 45 seconds (a hung request never throws an error by itself).
+const stallGuard = p => new Promise((res, rej) => {
+  lastProg = Date.now();
+  const iv = setInterval(() => { if (Date.now() - lastProg > 45000) { clearInterval(iv); rej(new Error("network stalled (timeout)")); } }, 3000);
+  p.then(v => { clearInterval(iv); res(v); }, e => { clearInterval(iv); rej(e); });
+});
+const modelProg = (k, c, t, m) => { lastProg = Date.now(); if (k.startsWith("fetch") && t) setStatus(`Saving the ${modelName(m)} model… ${Math.round(c / t * 100)}% (one-time download, then it is kept on this computer)`); };
+
+async function load(m) {
+  for (let i = 0; i < 6; i++) {
+    const dev = gpuOK ? "gpu" : "cpu";
+    try { await stallGuard(preload({ ...cfg(m, dev), progress: (k, c, t) => modelProg(k, c, t, m) })); return; }
+    catch (e) {
+      console.warn("Model load failed", e);
+      if (isNet(e)) { setStatus(`Download interrupted, retrying (${i + 1}/5)…`); await sleep(1500 * (i + 1)); continue; }
+      if (dev === "gpu") { gpuOK = false; continue; }
+      throw e;
+    }
+  }
+  throw new Error("The model download keeps getting interrupted. Check your connection, or choose the Fast model (smaller download).");
+}
+const ready = {};
+const ensure = m => ready[m] ??= (async () => {
+  setStatus("Loading AI model…");
+  try { await load(m); try { localStorage.setItem(savedKey(m), "1"); } catch {} }
+  catch (e) { delete ready[m]; throw e; }   // don't remember failures, so the next try starts fresh
+  finally { setStatus(""); }
+})();
+async function run(file, m, onProg) {
+  await ensure(m);
+  for (let i = 0; ; i++) {
+    const dev = gpuOK ? "gpu" : "cpu";
+    try { return await removeBackground(file, { ...cfg(m, dev), progress: onProg }); }
+    catch (e) {
+      if (i >= 2) throw e;
+      if (dev === "gpu" && !isNet(e)) gpuOK = false;
+      await sleep(1000);
+    }
+  }
+}
+// On page open: save every model in the background (this computer's own model first, then smallest to largest).
+// Models already saved on an earlier visit are skipped, so nothing is downloaded again.
+Promise.resolve(navigator.storage?.persist?.()).catch(() => {});
+(async () => {
+  const size = { isnet_quint8: 1, isnet_fp16: 2, isnet: 3 };
+  const saved = m => { try { return localStorage.getItem(savedKey(m)) === "1"; } catch { return false; } };
+  const order = [DEFAULT_MODEL, ...MODELS.map(x => x[0]).filter(m => m !== DEFAULT_MODEL).sort((a, b) => size[a] - size[b])];
+  for (const m of order) { if (saved(m)) continue; try { await ensure(m); } catch { break; } }
+})();
+
+/* ---------- scheduler: all groups share one queue, taken in turns ---------- */
+const groups = [];
+let active = 0, turn = 0;
+const limit = () => gpuOK ? 2 : (navigator.hardwareConcurrency >= 8 ? 2 : 1);
+function pump() {
+  while (active < limit()) {
+    const waiting = groups.filter(g => g.items.some(i => i.state === "queued"));
+    if (!waiting.length) return;
+    const g = waiting[turn++ % waiting.length];
+    start(g, g.items.find(i => i.state === "queued"));
+  }
+}
+async function start(g, it) {
+  active++; it.state = "working"; it.phase = "Loading AI model…"; it.t0 = Date.now(); draw(it);
+  const tick = setInterval(() => draw(it), 1000);
+  try {
+    const blob = await run(it.file, it.model, (k) => { if (!k.startsWith("fetch")) { it.phase = "Removing background…"; draw(it); } });
+    clearInterval(tick);
+    if (it.state === "removed") { active--; pump(); return; }
+    it.blob = blob;
+    it.bmp = await createImageBitmap(blob);
+    it.state = "done"; it.done = it.model;
+    draw(it); refreshThumb(it, g);
+  } catch (e) {
+    clearInterval(tick);
+    console.error(e); it.state = "error";
+    it.msg = location.protocol === "file:" ? "Blocked: open via a web server"
+      : isNet(e) ? "Download interrupted. Press Retry." : "Failed: " + (e.message || "unknown error");
+    draw(it);
+  }
+  active--; updateGroup(g); pump();
+}
+
+/* ---------- enhancement (optional, applied to the cutout before the background is added) ---------- */
+const LV = {
+  light:  { s: .25, c: 1.04, sat: 1.05, lo: 6,  hi: 249 },
+  medium: { s: .5,  c: 1.08, sat: 1.10, lo: 12, hi: 243 },
+  strong: { s: .8,  c: 1.12, sat: 1.16, lo: 20, hi: 235 }
+};
+const nb = (s, j, c, cur) => s[j + 3] < 128 ? cur : s[j + c];   // ignore transparent neighbours so edges don't get dark rims
+function enhance(ctx, w, h, level) {
+  const p = LV[level], im = ctx.getImageData(0, 0, w, h), d = im.data, s = new Uint8ClampedArray(d), a = p.s, W = w * 4, k = 1 + 4 * a;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * W + x * 4, al = s[i + 3];
+      if (al === 0) continue;
+      let r = s[i], gr = s[i + 1], b = s[i + 2];
+      if (al >= 250 && x > 0 && y > 0 && x < w - 1 && y < h - 1) {          // sharpen solid pixels only
+        const L = i - 4, R = i + 4, U = i - W, D = i + W;
+        r  = r  * k - a * (nb(s, L, 0, r)  + nb(s, R, 0, r)  + nb(s, U, 0, r)  + nb(s, D, 0, r));
+        gr = gr * k - a * (nb(s, L, 1, gr) + nb(s, R, 1, gr) + nb(s, U, 1, gr) + nb(s, D, 1, gr));
+        b  = b  * k - a * (nb(s, L, 2, b)  + nb(s, R, 2, b)  + nb(s, U, 2, b)  + nb(s, D, 2, b));
+      }
+      r = (r - 128) * p.c + 128; gr = (gr - 128) * p.c + 128; b = (b - 128) * p.c + 128;   // contrast
+      const gray = .299 * r + .587 * gr + .114 * b;                                          // colour
+      d[i] = gray + (r - gray) * p.sat; d[i + 1] = gray + (gr - gray) * p.sat; d[i + 2] = gray + (b - gray) * p.sat;
+      d[i + 3] = al <= p.lo ? 0 : al >= p.hi ? 255 : Math.round((al - p.lo) * 255 / (p.hi - p.lo));  // cleaner edges
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+}
+const cnv = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
+const toBlob = (c, m, q) => new Promise(r => c.toBlob(r, m, q));
+
+/* small preview that shows the enhancement */
+async function refreshThumb(it, g) {
+  if (it.state !== "done" || !it.bmp) return;
+  const tk = it.tk = (it.tk || 0) + 1;
+  const sc = Math.min(1, 360 / Math.max(it.bmp.width, it.bmp.height));
+  const w = Math.max(1, Math.round(it.bmp.width * sc)), h = Math.max(1, Math.round(it.bmp.height * sc));
+  const c = cnv(w, h), x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(it.bmp, 0, 0, w, h);
+  if (g.enh !== "off") enhance(x, w, h, g.enh);
+  const b = await toBlob(c, "image/png");
+  if (tk !== it.tk || it.state !== "done") return;
+  it.thumb && URL.revokeObjectURL(it.thumb);
+  it.thumb = URL.createObjectURL(b);
+  draw(it);
+}
+
+/* ---------- groups & cards ---------- */
+let gid = 0;
+function addGroup() {
+  const g = { id: ++gid, items: [], fmt: "png", bg: "", enh: "off", name: "Group " + gid, model: DEFAULT_MODEL };
+  const el = document.createElement("section");
+  el.className = "group";
+  el.innerHTML = `
+    <div class="ghead">
+      <label class="f">Group name<input type="text" class="gname" value="${g.name}"></label>
+      <label class="f">AI model<select class="gmodel">${MODELS.map(m => `<option value="${m[0]}">${m[1]}</option>`).join("")}</select></label>
+      <label class="f">Enhance photo<select class="genh"><option value="off">Off (exact pixels)</option><option value="light">Light</option><option value="medium">Medium</option><option value="strong">Strong</option></select></label>
+      <label class="f">Output format<select class="gfmt"><option value="png">PNG (lossless, transparent)</option><option value="webp">WebP (transparent)</option><option value="jpg">JPG (no transparency)</option></select></label>
+      <label class="f">Background<select class="gbg"><option value="">Transparent</option><option value="#ffffff">White</option><option value="#000000">Black</option><option value="custom">Custom colour…</option></select></label>
+      <label class="f gcolwrap" hidden>Colour<input type="color" class="gcol" value="#0e7c66"></label>
+      <span class="spacer"></span>
+      <button class="btn primary gdl" disabled>Download all</button>
+      <button class="btn grm">Remove group</button>
+    </div>
+    <div class="note" hidden><span class="ntext"></span><button class="btn sm primary nbtn">Process again now</button></div>
+    <div class="drop" tabindex="0" role="button"><strong>Drop photos here, or click to choose</strong>JPG, PNG or WebP · as many as you like</div>
+    <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+    <div class="grid"></div>
+    <div class="foot"></div>`;
+  g.el = el;
+  const $ = s => el.querySelector(s);
+  $(".gmodel").value = g.model;
+  const drop = $(".drop"), inp = $("input[type=file]");
+  drop.onclick = () => inp.click();
+  drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inp.click(); } };
+  inp.onchange = () => { addFiles(g, [...inp.files]); inp.value = ""; };
+  ["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => addFiles(g, [...e.dataTransfer.files]));
+  $(".gname").oninput = e => g.name = e.target.value.trim() || "photos";
+  $(".gmodel").onchange = e => { g.model = e.target.value; checkNote(g); };
+  $(".nbtn").onclick = () => redo(g, g.items.filter(i => (i.state === "done" || i.state === "error") && i.model !== g.model));
+  $(".genh").onchange = e => { g.enh = e.target.value; clearTimeout(g.tm); g.tm = setTimeout(() => g.items.forEach(i => refreshThumb(i, g)), 200); };
+  $(".gfmt").onchange = e => g.fmt = e.target.value;
+  $(".gbg").onchange = e => {
+    $(".gcolwrap").hidden = e.target.value !== "custom";
+    g.bg = e.target.value === "custom" ? $(".gcol").value : e.target.value;
+    applyBg(g);
+  };
+  $(".gcol").oninput = e => { g.bg = e.target.value; applyBg(g); };
+  $(".gdl").onclick = () => downloadAll(g);
+  $(".grm").onclick = () => {
+    g.items.forEach(i => { i.state = "removed"; [i.src, i.url, i.thumb].forEach(u => u && URL.revokeObjectURL(u)); });
+    el.remove(); groups.splice(groups.indexOf(g), 1);
+  };
+  groups.push(g);
+  document.getElementById("groups").appendChild(el);
+  updateGroup(g);
+}
+
+function addFiles(g, files) {
+  for (const f of files) {
+    if (!/^image\/(png|jpe?g|webp)$/.test(f.type)) continue;
+    const it = { file: f, model: g.model, state: "queued", src: URL.createObjectURL(f) };
+    const d = document.createElement("div");
+    d.className = "card";
+    d.innerHTML = `<div class="thumb checker"><img alt=""></div><div class="nm"></div><div class="st"></div><div class="row"><button class="btn sm dlb" disabled>Download</button><button class="btn sm again" title="Process again with the selected AI model" aria-label="Process again" disabled>↻</button><button class="btn sm rm" aria-label="Remove photo">✕</button></div>`;
+    d.querySelector(".nm").textContent = f.name;
+    d.querySelector(".dlb").onclick = () => { if (it.state === "error") redo(g, [it]); else single(it, g); };
+    d.querySelector(".again").onclick = () => redo(g, [it]);
+    d.querySelector(".rm").onclick = () => {
+      if (it.state === "working") return;
+      it.state = "removed"; [it.src, it.url, it.thumb].forEach(u => u && URL.revokeObjectURL(u));
+      g.items.splice(g.items.indexOf(it), 1); d.remove(); updateGroup(g);
+    };
+    it.el = d; g.items.push(it);
+    g.el.querySelector(".grid").appendChild(d);
+    draw(it);
+  }
+  applyBg(g); updateGroup(g); pump();
+}
+
+/* process finished (or failed) photos again with the group's current model */
+function redo(g, items) {
+  for (const it of items) {
+    if (it.state === "working" || it.state === "queued") continue;
+    it.thumb && URL.revokeObjectURL(it.thumb);
+    it.blob = it.bmp = it.thumb = null; it.tk = (it.tk || 0) + 1;
+    it.model = g.model; it.state = "queued"; draw(it);
+  }
+  updateGroup(g); pump();
+}
+function checkNote(g) {
+  const old = g.items.filter(i => (i.state === "done" || i.state === "error") && i.model !== g.model);
+  const n = g.el.querySelector(".note");
+  n.hidden = !old.length;
+  if (old.length) n.querySelector(".ntext").textContent =
+    `${old.length} photo${old.length > 1 ? "s were" : " was"} made with the ${modelName(old[0].model)} model. Process ${old.length > 1 ? "them" : "it"} again with ${modelName(g.model)}?`;
+}
+
+function draw(it) {
+  const d = it.el, img = d.querySelector("img"), st = d.querySelector(".st"), b = d.querySelector(".dlb");
+  d.dataset.state = it.state;
+  d.querySelector(".again").disabled = !(it.state === "done" || it.state === "error");
+  if (it.state === "done") {
+    st.textContent = `Done · ${it.bmp.width}×${it.bmp.height} · ${modelName(it.done)}`;
+    img.src = it.thumb || it.src; b.textContent = "Download"; b.disabled = false;
+  } else {
+    img.src = it.src;
+    st.textContent = it.state === "queued" ? "Waiting…"
+      : it.state === "working" ? `${it.phase} ${Math.round((Date.now() - it.t0) / 1000)}s` : it.msg;
+    b.textContent = it.state === "error" ? "Retry" : "Download";
+    b.disabled = it.state !== "error";
+  }
+}
+function applyBg(g) {
+  g.items.forEach(i => {
+    const t = i.el.querySelector(".thumb");
+    t.classList.toggle("checker", !g.bg);
+    t.style.backgroundColor = g.bg || "";
+  });
+}
+function updateGroup(g) {
+  const done = g.items.filter(i => i.state === "done").length;
+  const btn = g.el.querySelector(".gdl");
+  btn.disabled = !done;
+  btn.textContent = done > 5 ? `Download all (${done}) as ZIP` : done > 1 ? `Download all (${done})` : "Download all";
+  g.el.querySelector(".foot").textContent = g.items.length
+    ? `${done} of ${g.items.length} finished` + (done > 5 ? " · more than 5 photos, so they download as one ZIP" : "") : "";
+  checkNote(g);
+}
+
+/* ---------- export (full resolution) ---------- */
+const MIME = { png: ["image/png", "png"], webp: ["image/webp", "webp"], jpg: ["image/jpeg", "jpg"] };
+async function encode(it, g) {
+  const [mime, ext] = MIME[g.fmt];
+  if (g.fmt === "png" && !g.bg && g.enh === "off") return { blob: it.blob, ext };   // untouched lossless cutout
+  const w = it.bmp.width, h = it.bmp.height;
+  let out = cnv(w, h);
+  const x = out.getContext("2d", { willReadFrequently: true });
+  x.drawImage(it.bmp, 0, 0);
+  if (g.enh !== "off") enhance(x, w, h, g.enh);
+  const fill = g.bg || (g.fmt === "jpg" ? "#ffffff" : "");
+  if (fill) {
+    const c2 = cnv(w, h), x2 = c2.getContext("2d");
+    x2.fillStyle = fill; x2.fillRect(0, 0, w, h); x2.drawImage(out, 0, 0); out = c2;
+  }
+  const blob = await toBlob(out, mime, g.fmt === "jpg" ? 0.98 : 1);
+  if (!blob || blob.type !== mime) return { blob: await toBlob(out, "image/png"), ext: "png" };
+  return { blob, ext };
+}
+const baseName = it => it.file.name.replace(/\.[^.]+$/, "") + "-no-bg";
+function save(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+async function single(it, g) { const { blob, ext } = await encode(it, g); save(blob, `${baseName(it)}.${ext}`); }
+async function downloadAll(g) {
+  const done = g.items.filter(i => i.state === "done");
+  if (done.length > 5) {
+    const used = new Set(), files = [];
+    for (const it of done) {
+      const { blob, ext } = await encode(it, g);
+      let n = `${baseName(it)}.${ext}`, k = 1;
+      while (used.has(n)) n = `${baseName(it)}-${k++}.${ext}`;
+      used.add(n);
+      files.push({ name: n, data: new Uint8Array(await blob.arrayBuffer()) });
+    }
+    save(makeZip(files), `${g.name}.zip`);
+  } else {
+    for (const it of done) { await single(it, g); await sleep(350); }
+  }
+}
+
+/* ---------- tiny ZIP writer (no compression, so images stay byte-for-byte) ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(lh.buffer, name, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(ch.buffer, name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((s, p) => s + (p.byteLength ?? p.length), 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], { type: "application/zip" });
+}
+
+document.getElementById("addGroup").onclick = addGroup;
+addGroup();
+</script>
+</body>
+</html>

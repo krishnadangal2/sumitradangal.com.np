@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Background remover | Krishna Dangal</title>
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Hind:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="style.css"></head><body>
+<header class="top"><div class="wrap bar"><a class="brand" href="index.html"><i class="fa-solid fa-mountain-sun"></i>Krishna Dangal</a>
+<div class="bar-r"><button id="theme" aria-label="Switch light or dark mode"><i class="fa-solid fa-circle-half-stroke"></i></button>
+<button id="menu" aria-label="Menu" aria-expanded="false"><i class="fa-solid fa-bars"></i></button></div>
+<nav aria-label="Main"><ul><li><a href="index.html"><i class="fa-solid fa-house"></i>Home</a></li><li><a href="about.html"><i class="fa-solid fa-mountain"></i>About</a></li><li><a href="picture.html"><i class="fa-solid fa-images"></i>Gallery</a></li><li><a href="bg-remover.html" aria-current=page><i class="fa-solid fa-wand-magic-sparkles"></i>BG Remover</a></li><li><a href="contact.html"><i class="fa-solid fa-envelope"></i>Contact</a></li></ul></nav></div></header>
+<main><div class="wrap"><section><h2>Batch background remover</h2>
+<p class="lead">Add photos, remove their backgrounds and download them. Everything runs in your browser and nothing is uploaded. <a href="background-remover-batch.html" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> Open full page</a></p>
+<iframe id="tool" src="background-remover-batch.html" title="Batch background remover" style="width:100%;height:900px;border:1px solid var(--line);border-radius:var(--r);background:var(--card)"></iframe>
+<script>
+const f=document.getElementById('tool'),fit=()=>{try{f.style.height=f.contentDocument.documentElement.scrollHeight+'px'}catch(e){}};
+f.addEventListener('load',()=>{fit();try{new ResizeObserver(fit).observe(f.contentDocument.body)}catch(e){}});
+</script></section></div></main>
+<dialog id="lb"><img alt=""></dialog>
+<footer>Thank you for visiting my website. <i class="fa-solid fa-heart"></i> Made in Gauradaha, Jhapa, Nepal</footer>
+<script src="main.js" defer></script></body></html>
